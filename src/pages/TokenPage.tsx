@@ -1,10 +1,14 @@
 import { Codex } from "@codex-data/sdk";
 import { Link, useParams } from "react-router-dom";
-import { useEffect, useState, Suspense } from "react";
+import { memo, useEffect, useState, Suspense } from "react";
+import { Zap } from "lucide-react";
 import { TokenChart, ChartDataPoint } from "@/components/TokenChart";
+import { FloatingTradePanel } from "@/components/FloatingTradePanel";
 import { TradingPanel } from "@/components/TradingPanel";
+import { TradePanelProvider, useTradePanel } from "@/contexts/trade-panel-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { EnhancedToken, PairFilterResult, PairRankingAttribute, RankingDirection } from "@codex-data/sdk/dist/sdk/generated/graphql";
 
 type TokenEvent = {
@@ -137,6 +141,7 @@ export default function TokenPage() {
   const tokenSymbol = details?.symbol ? `(${details.symbol})` : '';
 
   return (
+    <TradePanelProvider>
     <main className="flex min-h-screen flex-col items-center p-6 md:p-12 space-y-6">
       <div className="w-full max-w-6xl flex justify-between items-center">
         <h1 className="text-2xl md:text-3xl font-bold truncate pr-4">
@@ -152,6 +157,10 @@ export default function TokenPage() {
           <Suspense fallback={<Card><CardHeader><CardTitle>Price Chart</CardTitle></CardHeader><CardContent><p>Loading chart...</p></CardContent></Card>}>
             <TokenChart data={bars} title={`${tokenSymbol || 'Token'} Price Chart`} />
           </Suspense>
+
+          <div className="flex justify-start">
+            <TradePanelToggleButton />
+          </div>
 
           <Card>
             <CardHeader>
@@ -262,5 +271,34 @@ export default function TokenPage() {
         </div>
       </div>
     </main>
+      {details && <FloatingTradePanelHost token={details} />}
+    </TradePanelProvider>
   );
 }
+
+function TradePanelToggleButton() {
+  const { isOpen, toggle } = useTradePanel();
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={isOpen}
+      aria-label="Toggle instant trade panel"
+      className={cn(
+        "inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all",
+        isOpen
+          ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-500"
+          : "border-border bg-background text-foreground hover:bg-muted/50"
+      )}
+    >
+      <Zap className="h-4 w-4" />
+      Instant Trade
+    </button>
+  );
+}
+
+const FloatingTradePanelHost = memo(function FloatingTradePanelHost({ token }: { token: EnhancedToken }) {
+  const { isOpen } = useTradePanel();
+  if (!isOpen) return null;
+  return <FloatingTradePanel token={token} />;
+});
