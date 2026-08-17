@@ -3,6 +3,8 @@ import {
   TICK_ARRAY_SIZE,
   MIN_SQRT_PRICE_X64,
   MAX_SQRT_PRICE_X64,
+  MIN_TICK,
+  MAX_TICK,
 } from "./constants";
 import {
   parsePoolState,
@@ -223,7 +225,9 @@ export async function simulateSwap(params: {
       const targetTick = zeroForOne
         ? arr.startTickIndex - tickSpacing
         : arr.startTickIndex + TICK_ARRAY_SIZE * tickSpacing;
-      const targetPrice = getSqrtPriceAtTick(targetTick);
+      // 复刻 swap.rs get_target_price_based_on_next_tick：先 clamp 到链上 tick 边界再求价格
+      const targetTickClamped = Math.max(MIN_TICK, Math.min(MAX_TICK, targetTick));
+      const targetPrice = getSqrtPriceAtTick(targetTickClamped);
       const targetPriceClamped =
         zeroForOne && targetPrice < sqrtPriceLimit ? sqrtPriceLimit :
         !zeroForOne && targetPrice > sqrtPriceLimit ? sqrtPriceLimit : targetPrice;
@@ -251,7 +255,7 @@ export async function simulateSwap(params: {
         } else {
           arrayStartIndex += TICK_ARRAY_SIZE * tickSpacing;
         }
-        state.tickCurrent = targetTick;
+        state.tickCurrent = targetTickClamped;
       } else {
         break; // 输入耗尽
       }
@@ -292,11 +296,43 @@ export async function simulateSwap(params: {
         ? arr.startTickIndex
         : arr.startTickIndex + TICK_ARRAY_SIZE * tickSpacing - tickSpacing;
     }
+    // 复刻 swap.rs get_target_price_based_on_next_tick：先 clamp 到链上 tick 边界再求价格
+    targetTick = Math.max(MIN_TICK, Math.min(MAX_TICK, targetTick));
 
     let targetPrice = getSqrtPriceAtTick(targetTick);
     // 价格限制（滑点保护）
     if (zeroForOne && targetPrice < sqrtPriceLimit) targetPrice = sqrtPriceLimit;
     if (!zeroForOne && targetPrice > sqrtPriceLimit) targetPrice = sqrtPriceLimit;
+
+    // 当前价格恰好落在已初始化 tick 上（零换一方向从 idx 含当前 tick 查找会命中自身）。
+    // 复刻链上 swap.rs is_price_change = false 分支：不调用 computeSwap（避免
+    // sqrt_price_current == sqrt_price_target 报错），直接 cross 该 tick 更新流动性，
+    // 不消耗输入，继续主循环。
+    if (targetPrice === state.sqrtPriceX64 && crossedTick) {
+      state.liquidity =
+        zeroForOne
+          ? state.liquidity - crossedTick.liquidityNet
+          : state.liquidity + crossedTick.liquidityNet;
+      // 链上 swap.rs 756-762：无 limit order 时 zeroForOne => tick_next - 1，否则 tick_next
+      state.tickCurrent = zeroForOne ? crossedTick.tick - 1 : crossedTick.tick;
+      continue;
+    }
+
+    // 当前 array 方向内已无流动性 tick，且目标价格不在 swap 方向内
+    // （如跨过 array 首个 tick 后 tickCurrent 低于起点）：直接推进到下一个 array，
+    // 复刻链上 next_tick_array_index + first_initialized_tick 路径，避免方向校验抛错。
+    if (
+      !crossedTick &&
+      (zeroForOne ? targetPrice >= state.sqrtPriceX64 : targetPrice <= state.sqrtPriceX64)
+    ) {
+      if (zeroForOne) {
+        arrayStartIndex -= TICK_ARRAY_SIZE * tickSpacing;
+      } else {
+        arrayStartIndex += TICK_ARRAY_SIZE * tickSpacing;
+      }
+      state.tickCurrent = zeroForOne ? targetTick - tickSpacing : targetTick + tickSpacing;
+      continue;
+    }
 
     const result = computeSwap(
       state.sqrtPriceX64,

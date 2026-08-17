@@ -1,5 +1,6 @@
 import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { EnhancedToken } from "@codex-data/sdk/dist/sdk/generated/graphql";
@@ -51,6 +52,27 @@ export const TradeForm = memo(function TradeForm({
   const handleTrade = useCallback(async () => {
     const toastId = toast.loading("Submitting trade request...");
     try {
+      // 链上实时余额校验（比 Codex 显示更可靠），避免 RPC 返回晦涩错误
+      const GAS_BUFFER_SOL = 0.01; // 覆盖交易费 + ATA 创建 rent
+      const onChainSolBalance = (await connection.getBalance(keypair.publicKey)) / LAMPORTS_PER_SOL;
+      if (onChainSolBalance <= 0) {
+        throw new Error(
+          `交易钱包 ${keypair.publicKey.toBase58()} 的 SOL 余额为 0，无法支付 gas 与转账费用。请先向该地址充值 SOL 后再交易。`,
+        );
+      }
+      if (direction === "buy") {
+        const buyValue = parseFloat(buyAmount) || 0;
+        if (onChainSolBalance < buyValue + GAS_BUFFER_SOL) {
+          throw new Error(
+            `交易钱包 SOL 余额不足（${onChainSolBalance.toFixed(6)} SOL）。本次买入需 ${buyValue.toFixed(4)} SOL，另需约 ${GAS_BUFFER_SOL} SOL 支付 gas 与账户创建费。请先向 ${keypair.publicKey.toBase58()} 充值。`,
+          );
+        }
+      } else if (onChainSolBalance < GAS_BUFFER_SOL) {
+        throw new Error(
+          `交易钱包 SOL 余额不足（${onChainSolBalance.toFixed(6)} SOL），卖出至少需要约 ${GAS_BUFFER_SOL} SOL 支付 gas。请先向 ${keypair.publicKey.toBase58()} 充值。`,
+        );
+      }
+
       const transaction = await createTransaction({
         direction,
         value: direction === "buy" ? parseFloat(buyAmount) : parseFloat(sellPercentage),
@@ -74,7 +96,15 @@ export const TradeForm = memo(function TradeForm({
       // Refresh balance after 1 second
       setTimeout(refreshBalance, 1000);
     } catch (error) {
-      toast.error((error as Error).message, { id: toastId });
+      const raw = (error as Error).message;
+      // 将常见 RPC 模拟错误映射为可读的中文提示
+      let message = raw;
+      if (/Attempt to debit an account but found no record of a prior credit/.test(raw)) {
+        message = "交易失败：代币账户余额不足（SPL 转账源账户没有足够余额）。请确认钱包 SOL / 代币余额充足后重试。";
+      } else if (/insufficient lamports|insufficient funds|AccountNotFound|account not found/.test(raw)) {
+        message = "交易失败：账户余额不足或账户不存在。请确认钱包 SOL 余额充足（含 gas 与账户创建费）后重试。";
+      }
+      toast.error(message, { id: toastId });
     }
   }, [direction, buyAmount, sellPercentage, createTransaction, keypair, connection, refreshBalance]);
 

@@ -52,22 +52,32 @@ export async function findPoolByMints(
     }
   }
 
+  // 同 token 对可能同时存在多个池子（含大量无流动性的刷池/假池），
+  // 遍历所有匹配项并选择流动性最大的池子，避免选中空池导致交易失败。
+  let best: RawPoolAccount | null = null;
+  let bestIsBase = false;
   for (const pool of unique) {
     const s = pool.state;
     const mint0 = s.tokenMint0.toBase58();
     const mint1 = s.tokenMint1.toBase58();
     const quote = quoteMint.toBase58();
     const token = tokenMint.toBase58();
-    if (mint0 === quote && mint1 === token) {
-      // 报价代币是 token0，基础代币是 token1
-      return { pubkey: pool.pubkey, state: s, token0IsBase: false, mints: [s.tokenMint0, s.tokenMint1] };
-    }
-    if (mint1 === quote && mint0 === token) {
-      // 报价代币是 token1，基础代币是 token0
-      return { pubkey: pool.pubkey, state: s, token0IsBase: true, mints: [s.tokenMint0, s.tokenMint1] };
+    const isQuoteToken0 = mint0 === quote && mint1 === token;
+    const isQuoteToken1 = mint1 === quote && mint0 === token;
+    if (!isQuoteToken0 && !isQuoteToken1) continue;
+    // 优先选流动性最大的池子（流动性为 0 的假池排最后）
+    if (!best || s.liquidity > best.state.liquidity) {
+      best = pool;
+      bestIsBase = isQuoteToken1; // 报价代币是 token1、token 是 token0 => token0 是基础代币
     }
   }
-  return null;
+  if (!best) return null;
+  return {
+    pubkey: best.pubkey,
+    state: best.state,
+    token0IsBase: bestIsBase,
+    mints: [best.state.tokenMint0, best.state.tokenMint1],
+  };
 }
 
 /** 按 mint 字段偏移查询池子（offset 73 = token_mint_0, 105 = token_mint_1） */
