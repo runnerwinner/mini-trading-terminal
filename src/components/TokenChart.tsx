@@ -62,52 +62,57 @@ export const TokenChart: React.FC<TokenChartProps> = ({
         <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart
-            data={data}
-            margin={{
-              top: 5,
-              right: 30,
-              left: 20,
-              bottom: 5,
-            }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-            <XAxis
-              dataKey="time"
-              tickFormatter={formatXAxis}
-              stroke="#AAAAAA"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              stroke="#AAAAAA"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(value) => `$${value.toFixed(2)}`}
-              domain={["auto", "auto"]}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "var(--background)",
-                borderColor: "var(--border)",
-                color: "var(--foreground)",
+        <div className="h-[clamp(220px,35vh,300px)]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={data}
+              margin={{
+                top: 5,
+                right: 30,
+                left: 20,
+                bottom: 5,
               }}
-              labelFormatter={formatXAxis}
-              formatter={formatTooltipValue}
-            />
-            <Line
-              type="monotone"
-              dataKey="close"
-              stroke="#FFFFFF"
-              activeDot={{ r: 8 }}
-              dot={false}
-            />
-            {/* Add lines for open, high, low if needed */}
-          </LineChart>
-        </ResponsiveContainer>
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="hsl(var(--border))"
+              />
+              <XAxis
+                dataKey="time"
+                tickFormatter={formatXAxis}
+                stroke="#AAAAAA"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                stroke="#AAAAAA"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => `$${value.toFixed(2)}`}
+                domain={["auto", "auto"]}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "var(--background)",
+                  borderColor: "var(--border)",
+                  color: "var(--foreground)",
+                }}
+                labelFormatter={formatXAxis}
+                formatter={formatTooltipValue}
+              />
+              <Line
+                type="monotone"
+                dataKey="close"
+                stroke="#FFFFFF"
+                activeDot={{ r: 8 }}
+                dot={false}
+              />
+              {/* Add lines for open, high, low if needed */}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </CardContent>
     </Card>
   );
