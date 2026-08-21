@@ -73,10 +73,7 @@ export const TokenChart: React.FC<TokenChartProps> = ({
                 bottom: 5,
               }}
             >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="hsl(var(--border))"
-              />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis
                 dataKey="time"
                 tickFormatter={formatXAxis}
