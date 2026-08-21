@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import NetworkList from "@/components/NetworkList";
-import { getCodexClient } from "@/lib/codex";
 
 type Network = {
   id: number;
@@ -29,6 +28,8 @@ export default function HomePage() {
 
   useEffect(() => {
     const fetchNetworks = async () => {
+      // 动态加载 Codex SDK，避免首屏主包携带整个 SDK
+      const { getCodexClient } = await import("@/lib/codex");
       const codexClient = getCodexClient();
       try {
         const result = await codexClient.queries.getNetworks({});
