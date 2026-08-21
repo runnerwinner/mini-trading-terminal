@@ -6,6 +6,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Assuming shadcn Card is installed
@@ -79,13 +80,13 @@ export const TokenChart: React.FC<TokenChartProps> = ({
                 tickFormatter={formatXAxis}
                 stroke="#AAAAAA"
                 fontSize={12}
-                tickLine={false}
+                tickLine={true}
                 axisLine={false}
               />
               <YAxis
                 stroke="#AAAAAA"
                 fontSize={12}
-                tickLine={false}
+                tickLine={true}
                 axisLine={false}
                 tickFormatter={(value) => `$${value.toFixed(2)}`}
                 domain={["auto", "auto"]}
@@ -99,12 +100,35 @@ export const TokenChart: React.FC<TokenChartProps> = ({
                 labelFormatter={formatXAxis}
                 formatter={formatTooltipValue}
               />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="open"
+                stroke="#60A5FA"
+                dot={false}
+                connectNulls
+              />
+              <Line
+                type="monotone"
+                dataKey="high"
+                stroke="#34D399"
+                dot={false}
+                connectNulls
+              />
+              <Line
+                type="monotone"
+                dataKey="low"
+                stroke="#F59E0B"
+                dot={false}
+                connectNulls
+              />
               <Line
                 type="monotone"
                 dataKey="close"
                 stroke="#FFFFFF"
                 activeDot={{ r: 8 }}
-                dot={false}
+                dot={true}
+                connectNulls
               />
               {/* Add lines for open, high, low if needed */}
             </LineChart>
